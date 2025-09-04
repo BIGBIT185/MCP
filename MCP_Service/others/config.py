@@ -7,6 +7,8 @@ WEATHER_API_CITY_URL="https://pa3yfqu3pq.re.qweatherapi.com/geo/v2/city/lookup"
 # SQLALCHEMY_DATABASE_URI=DB_URI
 
 deep_seek_api_key="sk-35266e757c784b2d8a04c724cb5af606"
+chat_model="deepseek-chat"
+
 
 flask_secret_api="liuchengkuiliuchengkui"
 flask_session_type="filesystem"  # 存储方式，可以换成 Redis
