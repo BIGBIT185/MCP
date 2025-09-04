@@ -6,7 +6,7 @@ def login_required(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if "user" not in session:  # 检查是否已登录
+        if "username" not in session:  # 检查是否已登录
             return jsonify({"error": "Unauthorized, please login first"}), 401
         return func(*args, **kwargs)
     return wrapper
