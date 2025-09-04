@@ -32,16 +32,16 @@ class MySQLDatabase:
         """创建表"""
         create_user_table_query = """
         CREATE TABLE IF NOT EXISTS users (
-            id VARCHAR(100) PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            email VARCHAR(100) UNIQUE NOT NULL,
+            id VARCHAR(100),
+            name VARCHAR(100) UNIQUE NOT NULL,
+            email VARCHAR(100),
             password VARCHAR(100) NOT NULL,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
         """
         create_history_table_query = """
         CREATE TABLE IF NOT EXISTS history (
-            id INT NOT NULL,
+            id VARCHAR(100),
             tool VARCHAR(100),
             text VARCHAR(200),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -54,112 +54,90 @@ class MySQLDatabase:
             print("表创建成功")
         except Error as e:
             print(f"创建表失败: {e}")
-    
-    def insert_histroy(self, id, tool, text):
-        """插入历史信息数据"""
-        insert_query = """
-        INSERT INTO histroy (id,tool,text)
-        VALUES (%s, %s, %s)
-        """
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(insert_query, (id, tool, text))
-            self.connection.commit()
-            print(f"历史信息插入成功，ID: {id},tool: {tool},text : {text}")
-            return id
-        except Error as e:
-            print(f"插入失败: {e}")
-            return None
-    def insert_user(self, name, email, password):
+    def insert_user(self, name, password):
         """插入用户数据"""
         insert_query = """
-        INSERT INTO users (name, email, password)
-        VALUES (%s, %s, %s)
+        INSERT INTO users (id,name, email, password)
+        VALUES (%s, %s, %s, %s)
         """
         try:
             cursor = self.connection.cursor()
-            cursor.execute(insert_query, (name, email, password))
+            cursor.execute(insert_query, ("",name,"", password))
             self.connection.commit()
-            print(f"用户 {name} 插入成功，ID: {cursor.lastrowid}")
-            return cursor.lastrowid
+            print(f"用户 {name} 插入成功")
+            return True
         except Error as e:
             print(f"插入失败: {e}")
-            return None
-    def get_users(self):
-        """查询所有用户"""
-        select_query = "SELECT * FROM users"
+            return False
+    def is_legal_user(self, name: str, password: str) -> bool:
+        """
+        检查是否存在合法的用户
+        
+        Args:
+            name: 用户名
+            password: 密码（明文）
+        
+        Returns:
+            bool: 如果用户存在且密码正确返回 True，否则返回 False
+        """
         try:
-            cursor = self.connection.cursor(dictionary=True)  # 返回字典格式
-            cursor.execute(select_query)
-            users = cursor.fetchall()
-            return users
+            conn = self.get_connection()
+            if not conn:
+                return False
+            
+            cursor = conn.cursor(dictionary=True)  # 返回字典格式的结果
+            
+            # 使用参数化查询防止SQL注入
+            query = "SELECT id, password FROM users WHERE name = %s"
+            cursor.execute(query, (name,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            
+            if result is None:
+                print(f"用户 '{name}' 不存在")
+                return False
+            
+            # 验证密码（这里假设密码是加密存储的）
+            stored_password = result['password']
+            user_id = result['id']
+            
+            # 比较密码（实际应该使用加密比较）
+            if self.verify_password(password, stored_password):
+                print(f"用户 '{name}' (ID: {user_id}) 验证成功")
+                return True
+            else:
+                print(f"用户 '{name}' 密码错误")
+                return False
+                
         except Error as e:
-            print(f"查询失败: {e}")
-            return []
-    def get_history(self):
-        """查询历史记录"""
-        select_query = "SELECT * FROM history"
+            print(f"数据库查询错误: {e}")
+            return False
+        
+    def has_user(self, name: str) -> bool:
+        """
+        检查是否存在该用户
+        """
         try:
-            cursor = self.connection.cursor(dictionary=True)  # 返回字典格式
-            cursor.execute(select_query)
-            history = cursor.fetchall()
-            return history
+            conn = self.get_connection()
+            if not conn:
+                return False
+            
+            cursor = conn.cursor(dictionary=True)  # 返回字典格式的结果
+            
+            # 使用参数化查询防止SQL注入
+            query = "SELECT id, password FROM users WHERE name = %s"
+            cursor.execute(query, (name,))
+            
+            result = cursor.fetchone()
+            cursor.close()
+            
+            if result is None:
+                print(f"用户 '{name}' 不存在")
+                return False
+            
+            return True
+                
         except Error as e:
-            print(f"查询失败: {e}")
-            return []
-    def update_user(self, user_id, age):
-        """更新用户年龄"""
-        update_query = "UPDATE users SET age = %s WHERE id = %s"
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(update_query, (age, user_id))
-            self.connection.commit()
-            print(f"用户 {user_id} 更新成功")
-            return cursor.rowcount
-        except Error as e:
-            print(f"更新失败: {e}")
-            return 0
-    
-    def delete_user(self, user_id):
-        """删除用户"""
-        delete_query = "DELETE FROM users WHERE id = %s"
-        try:
-            cursor = self.connection.cursor()
-            cursor.execute(delete_query, (user_id,))
-            self.connection.commit()
-            print(f"用户 {user_id} 删除成功")
-            return cursor.rowcount
-        except Error as e:
-            print(f"删除失败: {e}")
-            return 0
-
-# 使用示例
-if __name__ == "__main__":
-    db = MySQLDatabase('localhost', 'test_db', 'root', '123456')
-    
-    if db.connect():
-        # 创建表
-        db.create_table()
-        
-        # 插入数据
-        db.insert_user('张三', 'zhangsan@email.com', 25)
-        db.insert_user('李四', 'lisi@email.com', 30)
-        
-        # 查询数据
-        users = db.get_users()
-        print("所有用户:")
-        for user in users:
-            print(user)
-        
-        # 更新数据
-        if users:
-            db.update_user(users[0]['id'], 26)
-        
-        # 再次查询
-        users = db.get_users()
-        print("更新后的用户:")
-        for user in users:
-            print(user)
-        
-        # 关闭连接
-        db.disconnect()
+            print(f"数据库查询错误: {e}")
+            return False
