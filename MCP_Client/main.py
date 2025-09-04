@@ -28,20 +28,47 @@ class ChatGptTool:
             }
         ]
         self.tools: List[Dict] = []  # 缓存工具定义
+#1.200 成功2.400 密码错误3.401 用户不存在 4.500 服务器错误
+    async def register(self, username: str, password: str) -> bool:
+        """注册新用户"""
+        try:
+            resp = await self.__http_client.post(
+                f"{self.__tool_server_url}/auth/register",
+                json={"username": username, "password": password},
+                follow_redirects=True,
+            )
+            if resp.status_code == 200:
+                print("注册成功！")
+                return True
+            elif resp.status_code == 400:
+                print("注册失败：用户名已存在")
+                return False
+            else:
+                print(f"注册失败: {resp.status_code}, {resp.text}")
+                return False
+        except Exception as e:
+            print(f"注册请求失败: {e}")
+            return False
 
-    async def login(self, username: str = "Alice") -> bool:
+    async def login(self, username: str, password: str) -> bool:
         """调用服务端登录接口，建立会话"""
         try:
             resp = await self.__http_client.post(
                 f"{self.__tool_server_url}/auth/login",
-                data={"username": username},
+                json={"username": username, "password": password},
                 follow_redirects=True,  # 避免 Flask 重定向丢失 Cookie
             )
             if resp.status_code == 200:
-                print(f"登录成功，Cookie: {self.__http_client.cookies}")
+                print("登录成功！")
                 return True
+            elif resp.status_code == 400:
+                print("登录失败：密码错误")
+                return False
+            elif resp.status_code == 401:
+                print("用户不存在，请先注册")
+                return False
             else:
-                print(f"登录失败: {resp.status_code}, {resp.text}")
+                print(f"服务器错误: {resp.status_code}, {resp.text}")
                 return False
         except Exception as e:
             print(f"登录请求失败: {e}")
@@ -125,18 +152,33 @@ if __name__ == "__main__":
     chat_tool = ChatGptTool()
 
     async def run():
-        # 先登录（必须，否则没有 Cookie 会被拒绝）
-        ok = await chat_tool.login(username="Alice")
-        if not ok:
-            return
-
-        # 启动时就刷新工具定义，避免每次对话都请求
-        await chat_tool.refresh_tools()
         while True:
-            user_input = input("You: ")
-            if user_input.lower() == "exit":
+            print("\n1. 登录")
+            print("2. 注册")
+            print("3. 退出")
+            choice = input("请选择操作 (1-3): ")
+
+            if choice == "3":
                 break
-            answer = await chat_tool.chat(user_input)
-            print(f"AI: {answer}")
+
+            username = input("请输入用户名: ")
+            password = input("请输入密码: ")
+
+            if choice == "1":
+                ok = await chat_tool.login(username, password)
+                if ok:
+                    # 登录成功，刷新工具定义
+                    await chat_tool.refresh_tools()
+                    # 进入聊天循环
+                    while True:
+                        user_input = input("\nYou (输入'exit'退出): ")
+                        if user_input.lower() == "exit":
+                            break
+                        answer = await chat_tool.chat(user_input)
+                        print(f"AI: {answer}")
+            elif choice == "2":
+                await chat_tool.register(username, password)
+            else:
+                print("无效的选择，请重试")
 
     asyncio.run(run())
