@@ -9,28 +9,27 @@ class ChatGptTool:
             base_url="https://api.deepseek.com",
         )
         self.model = chat_model  # DeepSeek的模型名称
-        self.messages=[]
+        self.system_prompt=[]
         self.load_system_message()
 
     def load_system_message(self,):
         """
         加载系统消息
         """
-        self.messages.append(prompts["poet_prompt"])
+        self.system_prompt.append(prompts["poet_prompt"])
     
-    def chat_with_history(self, message):
+    def chat_with_history(self, messages):
         """
         与AI进行对话,带有历史记录
         """
         try:
-            self.messages.append({"role": "user", "content": message})
+            messages=self.system_prompt+messages
             response = self.__client.chat.completions.create(
                 model=self.model,
-                messages=self.messages,
+                messages=messages,
                 stream=False
             )
             ai_reply=response.choices[0].message.content
-            self.messages.append({"role": "assistant", "content": ai_reply})
             return ai_reply
         except Exception as e:
             return f"错误: {str(e)}"
