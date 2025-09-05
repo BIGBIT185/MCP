@@ -481,42 +481,26 @@ def main():
         success = db_manager.insert_history("alice", "agent1", [], "我想知道北京的天气", "user", tool_calls_id)
         print(f"插入结果: {success}")
         
-        success = db_manager.insert_history("alice", "agent2", None, "翻译Hello World", "assistant", "call_67890")
+        success = db_manager.insert_history("alice", "agent1", None, "翻译Hello World", "assistant", "call_67890")
         print(f"插入结果: {success}")
         
         # 获取所有历史记录
         print("获取agent1的所有历史记录...")
         history = db_manager.get_all_history("alice", "agent1")
         for i, record in enumerate(history, 1):
-            print(f"{i}. Role: {record['role']}, Content: {record['content']}")
-            if 'tool_calls' in record:
-                print(f"   Tool Calls: {record['tool_calls']}")
-            if 'tool_calls_id' in record:
-                print(f"   Tool Calls ID: {record['tool_calls_id']}")
-            print(f"   Created At: {record['created_at']}")
-            print()
+            print(record)
         
         # 获取最近2条历史记录
         print("获取agent1的最近2条历史记录...")
         recent_history = db_manager.get_last_n_history("alice", "agent1", 2)
         for i, record in enumerate(recent_history, 1):
-            print(f"{i}. Role: {record['role']}, Content: {record['content']}")
-            if 'tool_calls' in record:
-                print(f"   Tool Calls: {record['tool_calls']}")
-            if 'tool_calls_id' in record:
-                print(f"   Tool Calls ID: {record['tool_calls_id']}")
-            print(f"   Created At: {record['created_at']}")
-            print()
+            print(record)
             
         # 根据tool_calls_id获取历史记录
         print(f"根据tool_calls_id '{tool_calls_id}' 获取历史记录...")
         tool_history = db_manager.get_history_by_tool_calls_id(tool_calls_id)
         for i, record in enumerate(tool_history, 1):
-            print(f"{i}. Name: {record['name']}, Agent: {record['agent']}, Role: {record['role']}, Content: {record['content']}")
-            if 'tool_calls' in record:
-                print(f"   Tool Calls: {record['tool_calls']}")
-            print(f"   Created At: {record['created_at']}")
-            print()
+            print(record)
             
         # 测试清空表功能
         print("\n=== 测试清空表功能 ===")
