@@ -203,7 +203,7 @@ class DatabaseManager:
             print(f"验证用户时发生错误: {e}")
             return False
     
-    def insert_history(self, user_name, agent_name, tool, text, is_llm):
+    def insert_history(self, user_name="", agent_name="", tool="", text="", is_llm=False):
         """插入历史记录，成功返回True，失败返回False"""
         try:
             cursor = self.connection.cursor()
@@ -221,7 +221,7 @@ class DatabaseManager:
             print(f"插入历史记录时发生错误: {e}")
             return False
     
-    def get_all_history(self, user_name, agent_name):
+    def get_all_history(self, user_name="", agent_name=""):
         """获取指定用户和代理的所有历史记录"""
         try:
             cursor = self.connection.cursor(dictionary=True)
@@ -243,7 +243,7 @@ class DatabaseManager:
             print(f"获取历史记录时发生错误: {e}")
             return []
     
-    def get_last_n_history(self, user_name, agent_name, n):
+    def get_last_n_history(self, user_name="", agent_name="", n=1):
         """获取指定用户和代理的最近n条历史记录，按id递减排序"""
         try:
             cursor = self.connection.cursor(dictionary=True)
