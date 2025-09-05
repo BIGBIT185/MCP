@@ -65,9 +65,10 @@ class DatabaseManager:
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(100),
             agent VARCHAR(100) NOT NULL,
-            tool VARCHAR(100),
-            text VARCHAR(200),
-            is_llm BOOLEAN,
+            tool_calls VARCHAR(100),
+            content VARCHAR(200),
+            role VARCHAR(30),
+            tool_calls_id VARCHAR(200),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (name) REFERENCES users(name) ON DELETE CASCADE
         )
@@ -80,19 +81,62 @@ class DatabaseManager:
             self.connection.commit()
             print("表创建成功或已存在")
             
-            # 检查是否需要添加agent列（兼容旧版本）
-            try:
-                cursor.execute("ALTER TABLE history ADD COLUMN agent VARCHAR(100) NOT NULL DEFAULT 'default_agent'")
-                self.connection.commit()
-                print("已添加agent列到history表")
-            except Error as e:
-                # 如果列已存在，忽略错误
-                if "Duplicate column name" not in str(e):
-                    print(f"添加agent列时发生错误: {e}")
+            # 检查并更新表结构（兼容旧版本）
+            self._update_table_structure()
             
             cursor.close()
         except Error as e:
             print(f"创建表时发生错误: {e}")
+    
+    def _update_table_structure(self):
+        """更新表结构以兼容新版本"""
+        try:
+            cursor = self.connection.cursor()
+            
+            # 检查并添加agent列（如果不存在）
+            try:
+                cursor.execute("ALTER TABLE history ADD COLUMN agent VARCHAR(100) NOT NULL DEFAULT 'default_agent'")
+                print("已添加agent列到history表")
+            except Error as e:
+                if "Duplicate column name" not in str(e):
+                    print(f"添加agent列时发生错误: {e}")
+            
+            # 检查并重命名tool列为tool_calls（如果存在）
+            try:
+                cursor.execute("ALTER TABLE history CHANGE tool tool_calls VARCHAR(100)")
+                print("已将tool列重命名为tool_calls")
+            except Error as e:
+                if "Unknown column 'tool' in 'history'" not in str(e):
+                    print(f"重命名tool列时发生错误: {e}")
+            
+            # 检查并重命名text列为content（如果存在）
+            try:
+                cursor.execute("ALTER TABLE history CHANGE text content VARCHAR(200)")
+                print("已将text列重命名为content")
+            except Error as e:
+                if "Unknown column 'text' in 'history'" not in str(e):
+                    print(f"重命名text列时发生错误: {e}")
+            
+            # 检查并重命名is_llm列为role（如果存在）
+            try:
+                cursor.execute("ALTER TABLE history CHANGE is_llm role VARCHAR(30)")
+                print("已将is_llm列重命名为role")
+            except Error as e:
+                if "Unknown column 'is_llm' in 'history'" not in str(e):
+                    print(f"重命名is_llm列时发生错误: {e}")
+            
+            # 检查并添加tool_calls_id列（如果不存在）
+            try:
+                cursor.execute("ALTER TABLE history ADD COLUMN tool_calls_id VARCHAR(200)")
+                print("已添加tool_calls_id列到history表")
+            except Error as e:
+                if "Duplicate column name" not in str(e):
+                    print(f"添加tool_calls_id列时发生错误: {e}")
+            
+            self.connection.commit()
+            cursor.close()
+        except Error as e:
+            print(f"更新表结构时发生错误: {e}")
     
     def drop_all_tables(self):
         """
@@ -203,17 +247,15 @@ class DatabaseManager:
             print(f"验证用户时发生错误: {e}")
             return False
     
-    def insert_history(self, user_name="", agent_name="", tool="", text="", is_llm=False):
+    def insert_history(self, user_name="", agent_name="", tool_calls="", content="", role="", tool_calls_id=""):
         """插入历史记录，成功返回True，失败返回False"""
         try:
             cursor = self.connection.cursor()
             insert_query = """
-            INSERT INTO history (name, agent, tool, text, is_llm) 
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO history (name, agent, tool_calls, content, role, tool_calls_id) 
+            VALUES (%s, %s, %s, %s, %s, %s)
             """
-            # 将Python的布尔值转换为MySQL支持的1/0
-            is_llm_value = 1 if is_llm else 0
-            cursor.execute(insert_query, (user_name, agent_name, tool, text, is_llm_value))
+            cursor.execute(insert_query, (user_name, agent_name, tool_calls, content, role, tool_calls_id))
             self.connection.commit()
             cursor.close()
             return True
@@ -226,7 +268,7 @@ class DatabaseManager:
         try:
             cursor = self.connection.cursor(dictionary=True)
             select_query = """
-            SELECT tool, text, is_llm, created_at 
+            SELECT tool_calls, content, role, tool_calls_id, created_at 
             FROM history 
             WHERE name = %s AND agent = %s
             ORDER BY created_at DESC
@@ -234,10 +276,6 @@ class DatabaseManager:
             cursor.execute(select_query, (user_name, agent_name))
             result = cursor.fetchall()
             cursor.close()
-            
-            # 将MySQL的1/0转换回Python布尔值
-            for record in result:
-                record['is_llm'] = bool(record['is_llm'])
             return result
         except Error as e:
             print(f"获取历史记录时发生错误: {e}")
@@ -248,7 +286,7 @@ class DatabaseManager:
         try:
             cursor = self.connection.cursor(dictionary=True)
             select_query = """
-            SELECT tool, text, is_llm, created_at 
+            SELECT tool_calls, content, role, tool_calls_id, created_at 
             FROM history 
             WHERE name = %s AND agent = %s
             ORDER BY id DESC 
@@ -258,13 +296,29 @@ class DatabaseManager:
             result = cursor.fetchall()
             cursor.close()
             
-            # 将结果按时间正序排列并转换布尔值
+            # 将结果按时间正序排列
             result.reverse()
-            for record in result:
-                record['is_llm'] = bool(record['is_llm'])
             return result
         except Error as e:
             print(f"获取最近历史记录时发生错误: {e}")
+            return []
+    
+    def get_history_by_tool_calls_id(self, tool_calls_id=""):
+        """根据tool_calls_id获取历史记录"""
+        try:
+            cursor = self.connection.cursor(dictionary=True)
+            select_query = """
+            SELECT name, agent, tool_calls, content, role, created_at 
+            FROM history 
+            WHERE tool_calls_id = %s
+            ORDER BY created_at ASC
+            """
+            cursor.execute(select_query, (tool_calls_id,))
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Error as e:
+            print(f"根据tool_calls_id获取历史记录时发生错误: {e}")
             return []
     
     def close_connection(self):
@@ -325,32 +379,40 @@ def main():
         
         # 插入历史记录
         print("插入历史记录...")
-        success = db_manager.insert_history("alice", "agent1", "搜索引擎", "查询Python教程", True)
+        tool_calls_id = "call_12345"
+        success = db_manager.insert_history("alice", "agent1", "搜索引擎", "查询Python教程", "assistant", tool_calls_id)
         print(f"插入结果: {success}")
         
-        success = db_manager.insert_history("alice", "agent1", "计算器", "计算2+2", False)
+        success = db_manager.insert_history("alice", "agent1", "计算器", "计算2+2", "user", tool_calls_id)
         print(f"插入结果: {success}")
         
-        success = db_manager.insert_history("alice", "agent1", "搜", "查询Python教程", True)
-        print(f"插入结果: {success}")
-        
-        success = db_manager.insert_history("alice", "agent1", "计", "计算2+2", False)
+        success = db_manager.insert_history("alice", "agent2", "翻", "翻译Hello World", "assistant", "call_67890")
         print(f"插入结果: {success}")
 
-        success = db_manager.insert_history("alice", "agent2", "翻译工具", "翻译Hello World", True)
+        success = db_manager.insert_history("alice", "agent2", "译", "翻译Hello World", "assistant", "call_67890")
+        print(f"插入结果: {success}")
+        success = db_manager.insert_history("alice", "agent2", "工", "翻译Hello World", "assistant", "call_67890")
+        print(f"插入结果: {success}")
+        success = db_manager.insert_history("alice", "agent2", "具", "翻译Hello World", "assistant", "call_67890")
         print(f"插入结果: {success}")
         
         # 获取所有历史记录
         print("获取agent1的所有历史记录...")
         history = db_manager.get_all_history("alice", "agent1")
         for i, record in enumerate(history, 1):
-            print(f"{i}. {record['tool']}: {record['text']} (AI: {record['is_llm']}) - {record['created_at']}")
+            print(f"{i}. {record['tool_calls']}: {record['content']} (role: {record['role']}) - {record['created_at']}")
         
         # 获取最近2条历史记录
-        print("获取agent1的最近2条历史记录...")
-        recent_history = db_manager.get_last_n_history("alice", "agent1", 2)
+        print("获取agent2的最近2条历史记录...")
+        recent_history = db_manager.get_last_n_history("alice", "agent2", 2)
         for i, record in enumerate(recent_history, 1):
-            print(f"{i}. {record['tool']}: {record['text']} (AI: {record['is_llm']}) - {record['created_at']}")
+            print(f"{i}. {record['tool_calls']}: {record['content']} (role: {record['role']}) - {record['created_at']}")
+            
+        # 根据tool_calls_id获取历史记录
+        print(f"根据tool_calls_id '{tool_calls_id}' 获取历史记录...")
+        tool_history = db_manager.get_history_by_tool_calls_id(tool_calls_id)
+        for i, record in enumerate(tool_history, 1):
+            print(f"{i}. {record['tool_calls']}: {record['content']} (role: {record['role']}) - {record['created_at']}")
             
         # 测试清空表功能
         print("\n=== 测试清空表功能 ===")
