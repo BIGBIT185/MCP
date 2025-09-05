@@ -42,15 +42,9 @@ class ChatGptTool:
         """
         try:
             username=session.get("username")
-            response = self.__client.chat.completions.create(
-                model=self.model,
-                messages=self.system_prompt+messages,
-                stream=False,
-            )
-            ai_reply=response.choices[0].message.content
-            self.messages.append({"role": "assistant", "content": ai_reply})
-            return ai_reply
-
+            
+            mytools=tools
+            mytools.pop(self.scenario,None)
             total_messages = self.system_prompt + messages
             for _ in range(max_iterations):
                 response = self.__client.chat.completions.create(
@@ -101,4 +95,5 @@ class ChatGptTool:
         except Exception as e:
             return f"错误: {str(e)}"
 
-chat_with_poet_tool=ChatGptTool("poet_prompt")
+chat_with_poet_tool=ChatGptTool("chat_with_poet")
+

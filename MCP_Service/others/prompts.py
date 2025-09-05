@@ -1,5 +1,5 @@
 prompts={
-    "poet_prompt":
+    "chat_with_poet":
     {
         "role": "system",
         "content": 
