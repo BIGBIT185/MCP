@@ -3,6 +3,8 @@ from openai import OpenAI
 from MCP_Service.others.config import deep_seek_api_key,chat_model
 from MCP_Service.others.prompts import prompts
 from MCP_Service.py_tools.schemas import tools
+from MCP_Service.utils.database import *
+from flask import session
 class ChatGptTool:
     def __init__(self,scenario):
         self.__client = OpenAI(
@@ -46,7 +48,7 @@ class ChatGptTool:
             mytools=tools
             mytools.pop(self.scenario,None)
             total_messages = self.system_prompt + messages
-            for _ in range(max_iterations):
+            for _ in range(5):
                 response = self.__client.chat.completions.create(
                     model=self.model,
                     messages=total_messages,
@@ -56,9 +58,9 @@ class ChatGptTool:
 
                 # 如果没有工具调用，返回最终结果
                 if not hasattr(message, "tool_calls") or not message.tool_calls:
-                    insert_history(username=username, agent=self.scenario, content=message.content,role="assistant")
+                    databasetool.insert_history(username=username, agent=self.scenario, content=message.content,role="assistant")
                     return message.content
-                insert_history(username=username, agent=self.scenario,tool_calls=message.tool_calls,role="assistant")
+                databasetool.insert_history(username=username, agent=self.scenario,tool_calls=message.tool_calls,role="assistant")
                 total_messages.append({
                     "role": "assistant",
                     "content": "",
@@ -77,15 +79,12 @@ class ChatGptTool:
                         handler = tool["handler"]
                         try:
                             # 支持异步/同步 handler
-                            if asyncio.iscoroutinefunction(handler):
-                                result = await handler(**args)
-                            else:
-                                result = handler(**args)
+                            result =  handler(**args)
                         except Exception as e:
                             result = {"error": str(e)}
                     else:
                         result = {"error": f"Tool {func_name} not found"}
-                    insert_history(username=username, agent=self.scenario,content=str(result),tool_call_id=tool_call.id,role="tool")
+                    databasetool.insert_history(username=username, agent=self.scenario,content=str(result),tool_call_id=tool_call.id,role="tool")
                     total_messages.append({
                         "role": "tool",
                         "content": str(result),
