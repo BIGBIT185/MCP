@@ -1,6 +1,7 @@
 import mysql.connector
 from mysql.connector import Error
 from datetime import datetime
+import json
 
 class DatabaseManager:
     def __init__(self, host="localhost", database="user_history_db", 
@@ -65,8 +66,8 @@ class DatabaseManager:
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(100),
             agent VARCHAR(100) NOT NULL,
-            tool_calls VARCHAR(100),
-            content VARCHAR(200),
+            tool_calls TEXT,
+            content TEXT,
             role VARCHAR(30),
             tool_calls_id VARCHAR(200),
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -101,21 +102,21 @@ class DatabaseManager:
                 if "Duplicate column name" not in str(e):
                     print(f"添加agent列时发生错误: {e}")
             
-            # 检查并重命名tool列为tool_calls（如果存在）
+            # 检查并修改tool_calls列为TEXT类型（如果存在）
             try:
-                cursor.execute("ALTER TABLE history CHANGE tool tool_calls VARCHAR(100)")
-                print("已将tool列重命名为tool_calls")
+                cursor.execute("ALTER TABLE history MODIFY COLUMN tool_calls TEXT")
+                print("已将tool_calls列修改为TEXT类型")
             except Error as e:
-                if "Unknown column 'tool' in 'history'" not in str(e):
-                    print(f"重命名tool列时发生错误: {e}")
+                if "Unknown column 'tool_calls' in 'history'" not in str(e):
+                    print(f"修改tool_calls列时发生错误: {e}")
             
-            # 检查并重命名text列为content（如果存在）
+            # 检查并修改content列为TEXT类型（如果存在）
             try:
-                cursor.execute("ALTER TABLE history CHANGE text content VARCHAR(200)")
-                print("已将text列重命名为content")
+                cursor.execute("ALTER TABLE history MODIFY COLUMN content TEXT")
+                print("已将content列修改为TEXT类型")
             except Error as e:
-                if "Unknown column 'text' in 'history'" not in str(e):
-                    print(f"重命名text列时发生错误: {e}")
+                if "Unknown column 'content' in 'history'" not in str(e):
+                    print(f"修改content列时发生错误: {e}")
             
             # 检查并重命名is_llm列为role（如果存在）
             try:
@@ -247,15 +248,29 @@ class DatabaseManager:
             print(f"验证用户时发生错误: {e}")
             return False
     
-    def insert_history(self, user_name="", agent_name="", tool_calls="", content="", role="", tool_calls_id=""):
-        """插入历史记录，成功返回True，失败返回False"""
+    def insert_history(self, user_name="", agent_name="", tool_calls=[], content="", role="", tool_calls_id=None):
+        """
+        插入历史记录，成功返回True，失败返回False
+        
+        参数:
+        - user_name: 用户名
+        - agent_name: 代理名称
+        - tool_calls: 工具调用列表，格式如 [{"id":"1","type": "function", "function":{"name":"get_weather","arguments":"12"}}]
+        - content: 内容文本
+        - role: 角色（如"user", "assistant"等）
+        - tool_calls_id: 工具调用ID（可选）
+        """
         try:
             cursor = self.connection.cursor()
             insert_query = """
             INSERT INTO history (name, agent, tool_calls, content, role, tool_calls_id) 
             VALUES (%s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(insert_query, (user_name, agent_name, tool_calls, content, role, tool_calls_id))
+            
+            # 将tool_calls列表转换为JSON字符串
+            tool_calls_json = json.dumps(tool_calls) if tool_calls else None
+            
+            cursor.execute(insert_query, (user_name, agent_name, tool_calls_json, content, role, tool_calls_id))
             self.connection.commit()
             cursor.close()
             return True
@@ -263,7 +278,7 @@ class DatabaseManager:
             print(f"插入历史记录时发生错误: {e}")
             return False
     
-    def get_all_history(self, user_name="", agent_name=""):
+    def get_all_history(self, user_name, agent_name):
         """获取指定用户和代理的所有历史记录"""
         try:
             cursor = self.connection.cursor(dictionary=True)
@@ -276,12 +291,35 @@ class DatabaseManager:
             cursor.execute(select_query, (user_name, agent_name))
             result = cursor.fetchall()
             cursor.close()
-            return result
+            
+            # 处理结果，将JSON字符串转换回列表，并过滤空字段
+            processed_result = []
+            for record in result:
+                processed_record = {
+                    "role": record["role"],
+                    "content": record["content"]
+                }
+                
+                # 如果tool_calls存在且不为空，则添加到结果中
+                if record["tool_calls"]:
+                    try:
+                        processed_record["tool_calls"] = json.loads(record["tool_calls"])
+                    except json.JSONDecodeError:
+                        processed_record["tool_calls"] = record["tool_calls"]
+                
+                # 如果tool_calls_id存在且不为空，则添加到结果中
+                if record["tool_calls_id"]:
+                    processed_record["tool_calls_id"] = record["tool_calls_id"]
+                
+                #processed_record["created_at"] = record["created_at"]
+                processed_result.append(processed_record)
+            
+            return processed_result
         except Error as e:
             print(f"获取历史记录时发生错误: {e}")
             return []
     
-    def get_last_n_history(self, user_name="", agent_name="", n=1):
+    def get_last_n_history(self, user_name, agent_name, n=1):
         """获取指定用户和代理的最近n条历史记录，按id递减排序"""
         try:
             cursor = self.connection.cursor(dictionary=True)
@@ -298,12 +336,35 @@ class DatabaseManager:
             
             # 将结果按时间正序排列
             result.reverse()
-            return result
+            
+            # 处理结果，将JSON字符串转换回列表，并过滤空字段
+            processed_result = []
+            for record in result:
+                processed_record = {
+                    "role": record["role"],
+                    "content": record["content"]
+                }
+                
+                # 如果tool_calls存在且不为空，则添加到结果中
+                if record["tool_calls"]:
+                    try:
+                        processed_record["tool_calls"] = json.loads(record["tool_calls"])
+                    except json.JSONDecodeError:
+                        processed_record["tool_calls"] = record["tool_calls"]
+                
+                # 如果tool_calls_id存在且不为空，则添加到结果中
+                if record["tool_calls_id"]:
+                    processed_record["tool_calls_id"] = record["tool_calls_id"]
+                
+                #processed_record["created_at"] = record["created_at"]
+                processed_result.append(processed_record)
+            
+            return processed_result
         except Error as e:
             print(f"获取最近历史记录时发生错误: {e}")
             return []
     
-    def get_history_by_tool_calls_id(self, tool_calls_id=""):
+    def get_history_by_tool_calls_id(self, tool_calls_id):
         """根据tool_calls_id获取历史记录"""
         try:
             cursor = self.connection.cursor(dictionary=True)
@@ -316,7 +377,28 @@ class DatabaseManager:
             cursor.execute(select_query, (tool_calls_id,))
             result = cursor.fetchall()
             cursor.close()
-            return result
+            
+            # 处理结果，将JSON字符串转换回列表，并过滤空字段
+            processed_result = []
+            for record in result:
+                processed_record = {
+                    "name": record["name"],
+                    "agent": record["agent"],
+                    "role": record["role"],
+                    "content": record["content"]
+                }
+                
+                # 如果tool_calls存在且不为空，则添加到结果中
+                if record["tool_calls"]:
+                    try:
+                        processed_record["tool_calls"] = json.loads(record["tool_calls"])
+                    except json.JSONDecodeError:
+                        processed_record["tool_calls"] = record["tool_calls"]
+                
+                #processed_record["created_at"] = record["created_at"]
+                processed_result.append(processed_record)
+            
+            return processed_result
         except Error as e:
             print(f"根据tool_calls_id获取历史记录时发生错误: {e}")
             return []
@@ -380,39 +462,61 @@ def main():
         # 插入历史记录
         print("插入历史记录...")
         tool_calls_id = "call_12345"
-        success = db_manager.insert_history("alice", "agent1", "搜索引擎", "查询Python教程", "assistant", tool_calls_id)
+        
+        # 示例tool_calls数据
+        tool_calls_data = [
+            {
+                "id": "1",
+                "type": "function",
+                "function": {
+                    "name": "get_weather",
+                    "arguments": "{\"city\": \"Beijing\"}"
+                }
+            }
+        ]
+        
+        success = db_manager.insert_history("alice", "agent1", tool_calls_data, "查询北京天气", "assistant", tool_calls_id)
         print(f"插入结果: {success}")
         
-        success = db_manager.insert_history("alice", "agent1", "计算器", "计算2+2", "user", tool_calls_id)
+        success = db_manager.insert_history("alice", "agent1", [], "我想知道北京的天气", "user", tool_calls_id)
         print(f"插入结果: {success}")
         
-        success = db_manager.insert_history("alice", "agent2", "翻", "翻译Hello World", "assistant", "call_67890")
-        print(f"插入结果: {success}")
-
-        success = db_manager.insert_history("alice", "agent2", "译", "翻译Hello World", "assistant", "call_67890")
-        print(f"插入结果: {success}")
-        success = db_manager.insert_history("alice", "agent2", "工", "翻译Hello World", "assistant", "call_67890")
-        print(f"插入结果: {success}")
-        success = db_manager.insert_history("alice", "agent2", "具", "翻译Hello World", "assistant", "call_67890")
+        success = db_manager.insert_history("alice", "agent2", None, "翻译Hello World", "assistant", "call_67890")
         print(f"插入结果: {success}")
         
         # 获取所有历史记录
         print("获取agent1的所有历史记录...")
         history = db_manager.get_all_history("alice", "agent1")
         for i, record in enumerate(history, 1):
-            print(f"{i}. {record['tool_calls']}: {record['content']} (role: {record['role']}) - {record['created_at']}")
+            print(f"{i}. Role: {record['role']}, Content: {record['content']}")
+            if 'tool_calls' in record:
+                print(f"   Tool Calls: {record['tool_calls']}")
+            if 'tool_calls_id' in record:
+                print(f"   Tool Calls ID: {record['tool_calls_id']}")
+            print(f"   Created At: {record['created_at']}")
+            print()
         
         # 获取最近2条历史记录
-        print("获取agent2的最近2条历史记录...")
-        recent_history = db_manager.get_last_n_history("alice", "agent2", 2)
+        print("获取agent1的最近2条历史记录...")
+        recent_history = db_manager.get_last_n_history("alice", "agent1", 2)
         for i, record in enumerate(recent_history, 1):
-            print(f"{i}. {record['tool_calls']}: {record['content']} (role: {record['role']}) - {record['created_at']}")
+            print(f"{i}. Role: {record['role']}, Content: {record['content']}")
+            if 'tool_calls' in record:
+                print(f"   Tool Calls: {record['tool_calls']}")
+            if 'tool_calls_id' in record:
+                print(f"   Tool Calls ID: {record['tool_calls_id']}")
+            print(f"   Created At: {record['created_at']}")
+            print()
             
         # 根据tool_calls_id获取历史记录
         print(f"根据tool_calls_id '{tool_calls_id}' 获取历史记录...")
         tool_history = db_manager.get_history_by_tool_calls_id(tool_calls_id)
         for i, record in enumerate(tool_history, 1):
-            print(f"{i}. {record['tool_calls']}: {record['content']} (role: {record['role']}) - {record['created_at']}")
+            print(f"{i}. Name: {record['name']}, Agent: {record['agent']}, Role: {record['role']}, Content: {record['content']}")
+            if 'tool_calls' in record:
+                print(f"   Tool Calls: {record['tool_calls']}")
+            print(f"   Created At: {record['created_at']}")
+            print()
             
         # 测试清空表功能
         print("\n=== 测试清空表功能 ===")
