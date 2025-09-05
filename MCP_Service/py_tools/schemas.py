@@ -1,5 +1,6 @@
 from MCP_Service.py_tools.weather_tools import *
 from MCP_Service.py_tools.file_tools import *
+from MCP_Service.py_tools.chatgpt_tools import *
 # ---------------- 工具注册表 ----------------
 tools: Dict[str, Dict[str, Any]] = {
     "get_weather": {
@@ -68,4 +69,25 @@ tools: Dict[str, Dict[str, Any]] = {
         },
         "handler": write_file_handler,
     },
+    "chat_with_poet": {
+        "schema": {
+            "type": "function",
+            "function": {
+                "name": "chat_with_poet",
+                "description": "与诗人AI进行对话，基于历史会话生成诗意的回答。",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "user_content": {
+                            "type": "string",
+                            "description": "用户输入的文本，例如一个问题、主题或提示语。"
+                        }
+                    },
+                    "required": ["user_content"],
+                },
+            },
+        },
+        "handler": chat_with_poet, 
+    },
+
 }
