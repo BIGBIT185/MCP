@@ -64,6 +64,7 @@ class DatabaseManager:
         CREATE TABLE IF NOT EXISTS history (
             id INT AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(100),
+            agent VARCHAR(100) NOT NULL,
             tool VARCHAR(100),
             text VARCHAR(200),
             is_llm BOOLEAN,
@@ -78,6 +79,17 @@ class DatabaseManager:
             cursor.execute(create_history_table_query)
             self.connection.commit()
             print("表创建成功或已存在")
+            
+            # 检查是否需要添加agent列（兼容旧版本）
+            try:
+                cursor.execute("ALTER TABLE history ADD COLUMN agent VARCHAR(100) NOT NULL DEFAULT 'default_agent'")
+                self.connection.commit()
+                print("已添加agent列到history表")
+            except Error as e:
+                # 如果列已存在，忽略错误
+                if "Duplicate column name" not in str(e):
+                    print(f"添加agent列时发生错误: {e}")
+            
             cursor.close()
         except Error as e:
             print(f"创建表时发生错误: {e}")
@@ -126,6 +138,32 @@ class DatabaseManager:
                 pass
             return False
     
+    def clear_users_table(self):
+        """清空用户表中的所有数据"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("DELETE FROM users")
+            self.connection.commit()
+            cursor.close()
+            print("用户表已清空")
+            return True
+        except Error as e:
+            print(f"清空用户表时发生错误: {e}")
+            return False
+    
+    def clear_history_table(self):
+        """清空历史记录表中的所有数据"""
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("DELETE FROM history")
+            self.connection.commit()
+            cursor.close()
+            print("历史记录表已清空")
+            return True
+        except Error as e:
+            print(f"清空历史记录表时发生错误: {e}")
+            return False
+    
     def insert_user(self, name, password):
         """插入用户，成功返回True，失败返回False"""
         try:
@@ -165,17 +203,17 @@ class DatabaseManager:
             print(f"验证用户时发生错误: {e}")
             return False
     
-    def insert_history(self, name, tool, text, is_llm):
+    def insert_history(self, user_name, agent_name, tool, text, is_llm):
         """插入历史记录，成功返回True，失败返回False"""
         try:
             cursor = self.connection.cursor()
             insert_query = """
-            INSERT INTO history (name, tool, text, is_llm) 
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO history (name, agent, tool, text, is_llm) 
+            VALUES (%s, %s, %s, %s, %s)
             """
             # 将Python的布尔值转换为MySQL支持的1/0
             is_llm_value = 1 if is_llm else 0
-            cursor.execute(insert_query, (name, tool, text, is_llm_value))
+            cursor.execute(insert_query, (user_name, agent_name, tool, text, is_llm_value))
             self.connection.commit()
             cursor.close()
             return True
@@ -183,17 +221,17 @@ class DatabaseManager:
             print(f"插入历史记录时发生错误: {e}")
             return False
     
-    def get_all_history(self, name):
-        """获取指定用户的所有历史记录"""
+    def get_all_history(self, user_name, agent_name):
+        """获取指定用户和代理的所有历史记录"""
         try:
             cursor = self.connection.cursor(dictionary=True)
             select_query = """
             SELECT tool, text, is_llm, created_at 
             FROM history 
-            WHERE name = %s 
-            ORDER BY created_at desc
+            WHERE name = %s AND agent = %s
+            ORDER BY created_at DESC
             """
-            cursor.execute(select_query, (name,))
+            cursor.execute(select_query, (user_name, agent_name))
             result = cursor.fetchall()
             cursor.close()
             
@@ -205,18 +243,18 @@ class DatabaseManager:
             print(f"获取历史记录时发生错误: {e}")
             return []
     
-    def get_last_n_history(self, name, n):
-        """获取指定用户的最近n条历史记录"""
+    def get_last_n_history(self, user_name, agent_name, n):
+        """获取指定用户和代理的最近n条历史记录，按id递减排序"""
         try:
             cursor = self.connection.cursor(dictionary=True)
             select_query = """
             SELECT tool, text, is_llm, created_at 
             FROM history 
-            WHERE name = %s 
-            ORDER BY created_at DESC 
+            WHERE name = %s AND agent = %s
+            ORDER BY id DESC 
             LIMIT %s
             """
-            cursor.execute(select_query, (name, n))
+            cursor.execute(select_query, (user_name, agent_name, n))
             result = cursor.fetchall()
             cursor.close()
             
@@ -287,26 +325,42 @@ def main():
         
         # 插入历史记录
         print("插入历史记录...")
-        success = db_manager.insert_history("alice", "搜索引擎", "查询Python教程", True)
+        success = db_manager.insert_history("alice", "agent1", "搜索引擎", "查询Python教程", True)
         print(f"插入结果: {success}")
         
-        success = db_manager.insert_history("alice", "计算器", "计算2+2", False)
+        success = db_manager.insert_history("alice", "agent1", "计算器", "计算2+2", False)
         print(f"插入结果: {success}")
         
-        success = db_manager.insert_history("alice", "翻译工具", "翻译Hello World", True)
+        success = db_manager.insert_history("alice", "agent1", "搜", "查询Python教程", True)
+        print(f"插入结果: {success}")
+        
+        success = db_manager.insert_history("alice", "agent1", "计", "计算2+2", False)
+        print(f"插入结果: {success}")
+
+        success = db_manager.insert_history("alice", "agent2", "翻译工具", "翻译Hello World", True)
         print(f"插入结果: {success}")
         
         # 获取所有历史记录
-        print("获取所有历史记录...")
-        history = db_manager.get_all_history("alice")
+        print("获取agent1的所有历史记录...")
+        history = db_manager.get_all_history("alice", "agent1")
         for i, record in enumerate(history, 1):
             print(f"{i}. {record['tool']}: {record['text']} (AI: {record['is_llm']}) - {record['created_at']}")
         
         # 获取最近2条历史记录
-        print("获取最近2条历史记录...")
-        recent_history = db_manager.get_last_n_history("alice", 2)
+        print("获取agent1的最近2条历史记录...")
+        recent_history = db_manager.get_last_n_history("alice", "agent1", 2)
         for i, record in enumerate(recent_history, 1):
             print(f"{i}. {record['tool']}: {record['text']} (AI: {record['is_llm']}) - {record['created_at']}")
+            
+        # 测试清空表功能
+        print("\n=== 测试清空表功能 ===")
+        print("清空历史记录表...")
+        success = db_manager.clear_history_table()
+        print(f"清空结果: {success}")
+        
+        print("清空用户表...")
+        success = db_manager.clear_users_table()
+        print(f"清空结果: {success}")
             
     finally:
         # 关闭数据库连接
