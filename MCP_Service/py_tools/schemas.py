@@ -1,8 +1,5 @@
-from MCP_Service.py_tools.weather_tools import *
-from MCP_Service.py_tools.file_tools import *
-from MCP_Service.py_tools.chatgpt_tools import *
 # ---------------- 工具注册表 ----------------
-tools: Dict[str, Dict[str, Any]] = {
+tools_schema = {
     "get_weather": {
         "schema": {
             "type": "function",
@@ -20,8 +17,7 @@ tools: Dict[str, Dict[str, Any]] = {
                     "required": ["location"]
                 },
             },
-        },
-        "handler": get_weather_handler,
+        }
     },
     "list_file": {
         "schema": {
@@ -31,8 +27,7 @@ tools: Dict[str, Dict[str, Any]] = {
                 "description": "List all files in the base directory.",
                 "parameters": {"type": "object", "properties": {}, "required": []},
             },
-        },
-        "handler": list_file_handler,
+        }
     },
     "read_file": {
         "schema": {
@@ -48,8 +43,7 @@ tools: Dict[str, Dict[str, Any]] = {
                     "required": ["name"],
                 },
             },
-        },
-        "handler": read_file_handler,
+        }
     },
     "write_file": {
         "schema": {
@@ -66,8 +60,7 @@ tools: Dict[str, Dict[str, Any]] = {
                     "required": ["name", "content"],
                 },
             },
-        },
-        "handler": write_file_handler,
+        }
     },
     "chat_with_poet": {
         "schema": {
@@ -86,12 +79,6 @@ tools: Dict[str, Dict[str, Any]] = {
                     "required": ["user_content"],
                 },
             },
-        },
-        "handler": chat_with_poet, 
-    },
-
+        }
+    }
 }
-
-#诗人工具集
-poet_tools = tools.copy()   # 浅拷贝，避免直接修改 tools
-poet_tools.pop("chat_with_poet", None)  # 移除诗人工具

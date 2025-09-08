@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, session
 from MCP_Service.utils.decorates import login_required
-from MCP_Service.py_tools.schemas import tools
+from MCP_Service.py_tools.schemas import tools_schema
 bp = Blueprint("tools", __name__, url_prefix="/tools")
 
 # ---------------- 路由 ----------------
@@ -8,8 +8,7 @@ bp = Blueprint("tools", __name__, url_prefix="/tools")
 @login_required
 def get_tools_schemas():
     """返回所有工具的 schema 列表"""
-    return jsonify({"tools_schemas": [t["schema"] for t in tools.values()]})
-
+    return jsonify({"tools_schemas": [t["schema"] for t in tools_schema.values()]})
 
 @bp.route("/call_tool", methods=["POST"])
 @login_required

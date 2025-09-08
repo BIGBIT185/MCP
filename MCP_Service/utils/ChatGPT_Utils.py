@@ -2,7 +2,7 @@ import json
 from openai import OpenAI
 from MCP_Service.others.config import deep_seek_api_key,chat_model
 from MCP_Service.others.prompts import prompts
-from MCP_Service.py_tools.schemas import poet_tools
+
 from MCP_Service.utils.database import *
 from flask import session
 class ChatGptTool:
@@ -92,5 +92,5 @@ class ChatGptTool:
         except Exception as e:
             return f"错误: {str(e)}"
 
-chat_with_poet_tool=ChatGptTool("chat_with_poet",poet_tools)
+
 
