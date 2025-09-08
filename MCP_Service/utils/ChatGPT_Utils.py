@@ -56,9 +56,9 @@ class ChatGptTool:
 
                 # 如果没有工具调用，返回最终结果
                 if not hasattr(message, "tool_calls") or not message.tool_calls:
-                    databasetool.insert_history(username=username, agent=self.scenario, content=message.content,role="assistant")
+                    databasetool.insert_history(user_name=username, agent_name=self.scenario, content=message.content,role="assistant")
                     return message.content
-                databasetool.insert_history(username=username, agent=self.scenario,tool_calls=message.tool_calls,role="assistant")
+                databasetool.insert_history(user_name=username, agent_name=self.scenario,tool_calls=message.tool_calls,role="assistant")
                 total_messages.append({
                     "role": "assistant",
                     "content": "",
@@ -82,7 +82,7 @@ class ChatGptTool:
                             result = {"error": str(e)}
                     else:
                         result = {"error": f"Tool {func_name} not found"}
-                    databasetool.insert_history(username=username, agent=self.scenario,content=str(result),tool_call_id=tool_call.id,role="tool")
+                    databasetool.insert_history(user_name=username, agent_name=self.scenario,content=str(result),tool_calls_id=tool_call.id,role="tool")
                     total_messages.append({
                         "role": "tool",
                         "content": str(result),
@@ -90,6 +90,7 @@ class ChatGptTool:
                     })
             return "已达到最大处理轮数，请简化请求。"
         except Exception as e:
+            print(f"错误: {str(e)}")
             return f"错误: {str(e)}"
 
 

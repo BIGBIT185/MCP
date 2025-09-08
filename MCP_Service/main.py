@@ -20,12 +20,14 @@ def register_blueprints(app):
     from MCP_Service.blueprints.tools import bp as tools_bp
     app.register_blueprint(tools_bp)
 
-
+#初始化工具
+tools=None
 def init_chat_tools():
     from MCP_Service.py_tools.weather_tools import get_weather_handler
     from MCP_Service.py_tools.file_tools import list_file_handler,read_file_handler,write_file_handler
     from MCP_Service.py_tools.chatgpt_tools import chat_with_poet
     from MCP_Service.py_tools.schemas import tools_schema
+    global tools
     tools = {
     "get_weather": {**tools_schema["get_weather"], "handler": get_weather_handler},
     "list_file": {**tools_schema["list_file"], "handler": list_file_handler},
@@ -34,9 +36,10 @@ def init_chat_tools():
     "chat_with_poet": {**tools_schema["chat_with_poet"], "handler": chat_with_poet},
     }
     chat_with_poet_tool=ChatGptTool("chat_with_poet",tools)
+init_chat_tools()
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="File Manager Flask Server")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", default=5000, type=int)
@@ -45,6 +48,9 @@ if __name__ == "__main__":
     get_base_dir().mkdir(exist_ok=True)
 
     register_blueprints(app)
-    init_chat_tools()
 
     app.run(host=args.host, port=args.port, debug=True)
+
+
+if __name__ == "__main__":
+    main()

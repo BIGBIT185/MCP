@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 from MCP_Service.utils.decorates import login_required
 from MCP_Service.py_tools.schemas import tools_schema
+from MCP_Service.main import tools
 bp = Blueprint("tools", __name__, url_prefix="/tools")
 
 # ---------------- 路由 ----------------
