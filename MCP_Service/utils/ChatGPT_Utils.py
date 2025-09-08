@@ -2,11 +2,11 @@ import json
 from openai import OpenAI
 from MCP_Service.others.config import deep_seek_api_key,chat_model
 from MCP_Service.others.prompts import prompts
-from MCP_Service.py_tools.schemas import tools
+from MCP_Service.py_tools.schemas import poet_tools
 from MCP_Service.utils.database import *
 from flask import session
 class ChatGptTool:
-    def __init__(self,scenario):
+    def __init__(self,scenario,tools):
         self.__client = OpenAI(
             api_key=deep_seek_api_key,
             base_url="https://api.deepseek.com",
@@ -15,6 +15,7 @@ class ChatGptTool:
         self.system_prompt=[]
         self.scenario=scenario
         self.load_system_message(scenario)
+        self.tools=tools
 
     def load_system_message(self,scenario):
         """
@@ -44,15 +45,12 @@ class ChatGptTool:
         """
         try:
             username=session.get("username")
-            
-            mytools=tools
-            mytools.pop(self.scenario,None)
             total_messages = self.system_prompt + messages
             for _ in range(5):
                 response = self.__client.chat.completions.create(
                     model=self.model,
                     messages=total_messages,
-                    tools=tools,
+                    tools=self.tools,
                 )
                 message = response.choices[0].message
 
@@ -74,7 +72,7 @@ class ChatGptTool:
                     # 调用本地工具
                     result=None
                     # 查找本地工具
-                    tool = tools.get(func_name)
+                    tool = self.tools.get(func_name)
                     if tool:
                         handler = tool["handler"]
                         try:
@@ -94,5 +92,5 @@ class ChatGptTool:
         except Exception as e:
             return f"错误: {str(e)}"
 
-chat_with_poet_tool=ChatGptTool("chat_with_poet")
+chat_with_poet_tool=ChatGptTool("chat_with_poet",poet_tools)
 

@@ -91,3 +91,7 @@ tools: Dict[str, Dict[str, Any]] = {
     },
 
 }
+
+#诗人工具集
+poet_tools = tools.copy()   # 浅拷贝，避免直接修改 tools
+poet_tools.pop("chat_with_poet", None)  # 移除诗人工具
