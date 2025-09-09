@@ -35,8 +35,10 @@ def init_chat_tools():
     "write_file": {**tools_schema["write_file"], "handler": write_file_handler},
     "chat_with_poet": {**tools_schema["chat_with_poet"], "handler": chat_with_poet},
     }
-    chat_with_poet_tool=ChatGptTool("chat_with_poet",tools)
+    
 init_chat_tools()
+chat_with_poet_tool=ChatGptTool("chat_with_poet",tools)
+
 
 
 def main():

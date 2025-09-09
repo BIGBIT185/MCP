@@ -11,7 +11,7 @@ class ChatGptTool:
         self.__tool_server_url = "http://localhost:5000"  # Flask 服务器地址
 
         # 一个全局 httpx.Client，会自动保存 Cookie（关键！）
-        self.__http_client = httpx.AsyncClient()
+        self.__http_client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
 
         self.__client = OpenAI(
             api_key=self.__openai_api_key_4_0_2,

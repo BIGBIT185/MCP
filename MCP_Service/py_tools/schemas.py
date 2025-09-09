@@ -82,3 +82,4 @@ tools_schema = {
         }
     }
 }
+tools_schema2=[t["schema"] for t in tools_schema.values()]

@@ -22,17 +22,19 @@ def call_tool():
     data = request.get_json()
     if not data:
         return jsonify({"error": "JSON payload is required"}), 400
-
     name = data.get("name")
     args = data.get("args", {})
 
     if name not in tools:
+        print(f"error: Unknown tool: {name}")
         return jsonify({"error": f"Unknown tool: {name}"}), 400
 
     try:
         result = tools[name]["handler"](args)
+        print(result)
         return jsonify(result)
     except Exception as e:
+        print(f"error:{str(e)}")
         return jsonify({"error": str(e)}), 500
 
 

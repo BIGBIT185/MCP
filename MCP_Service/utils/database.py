@@ -291,7 +291,7 @@ class DatabaseManager:
             cursor.execute(select_query, (user_name, agent_name))
             result = cursor.fetchall()
             cursor.close()
-            
+
             # 处理结果，将JSON字符串转换回列表，并过滤空字段
             processed_result = []
             for record in result:
@@ -299,21 +299,21 @@ class DatabaseManager:
                     "role": record["role"],
                     "content": record["content"]
                 }
-                
+
                 # 如果tool_calls存在且不为空，则添加到结果中
                 if record["tool_calls"]:
                     try:
                         processed_record["tool_calls"] = json.loads(record["tool_calls"])
                     except json.JSONDecodeError:
                         processed_record["tool_calls"] = record["tool_calls"]
-                
+
                 # 如果tool_calls_id存在且不为空，则添加到结果中
                 if record["tool_calls_id"]:
                     processed_record["tool_calls_id"] = record["tool_calls_id"]
-                
+
                 #processed_record["created_at"] = record["created_at"]
                 processed_result.append(processed_record)
-            
+
             return processed_result
         except Error as e:
             print(f"获取历史记录时发生错误: {e}")
@@ -333,10 +333,10 @@ class DatabaseManager:
             cursor.execute(select_query, (user_name, agent_name, n))
             result = cursor.fetchall()
             cursor.close()
-            
+
             # 将结果按时间正序排列
             result.reverse()
-            
+
             # 处理结果，将JSON字符串转换回列表，并过滤空字段
             processed_result = []
             for record in result:
@@ -344,21 +344,21 @@ class DatabaseManager:
                     "role": record["role"],
                     "content": record["content"]
                 }
-                
+
                 # 如果tool_calls存在且不为空，则添加到结果中
                 if record["tool_calls"]:
                     try:
                         processed_record["tool_calls"] = json.loads(record["tool_calls"])
                     except json.JSONDecodeError:
                         processed_record["tool_calls"] = record["tool_calls"]
-                
+
                 # 如果tool_calls_id存在且不为空，则添加到结果中
                 if record["tool_calls_id"]:
                     processed_record["tool_calls_id"] = record["tool_calls_id"]
-                
+
                 #processed_record["created_at"] = record["created_at"]
                 processed_result.append(processed_record)
-            
+
             return processed_result
         except Error as e:
             print(f"获取最近历史记录时发生错误: {e}")

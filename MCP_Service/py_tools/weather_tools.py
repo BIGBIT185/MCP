@@ -47,6 +47,7 @@ def get_weather_handler(args: Dict[str, Any]):
             "location": location_name_std,
             "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
+        print(f"Weather data for {location_name_std}: {weather_condition}")
         return weather_condition
     except requests.exceptions.RequestException as e:
         raise Exception(f"Request error: {str(e)}")

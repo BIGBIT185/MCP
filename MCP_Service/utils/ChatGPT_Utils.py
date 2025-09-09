@@ -2,9 +2,9 @@ import json
 from openai import OpenAI
 from MCP_Service.others.config import deep_seek_api_key,chat_model
 from MCP_Service.others.prompts import prompts
-
 from MCP_Service.utils.database import *
 from flask import session
+from MCP_Service.py_tools.schemas import tools_schema
 class ChatGptTool:
     def __init__(self,scenario,tools):
         self.__client = OpenAI(
@@ -16,6 +16,7 @@ class ChatGptTool:
         self.scenario=scenario
         self.load_system_message(scenario)
         self.tools=tools
+        self.my_tools_schemas = [t["schema"] for t in tools_schema.values() if t["schema"]["function"]["name"] != "chat_with_poet"]
 
     def load_system_message(self,scenario):
         """
@@ -46,11 +47,13 @@ class ChatGptTool:
         try:
             username=session.get("username")
             total_messages = self.system_prompt + messages
+            
             for _ in range(5):
+                print(total_messages)
                 response = self.__client.chat.completions.create(
                     model=self.model,
                     messages=total_messages,
-                    tools=self.tools,
+                    tools=self.my_tools_schemas,
                 )
                 message = response.choices[0].message
 
@@ -58,7 +61,18 @@ class ChatGptTool:
                 if not hasattr(message, "tool_calls") or not message.tool_calls:
                     databasetool.insert_history(user_name=username, agent_name=self.scenario, content=message.content,role="assistant")
                     return message.content
-                databasetool.insert_history(user_name=username, agent_name=self.scenario,tool_calls=message.tool_calls,role="assistant")
+                tool_calls = [
+                    {
+                        "id": call.id,
+                        "type": "function",
+                        "function": {
+                            "name": call.function.name,
+                            "arguments": call.function.arguments
+                        }
+                    }
+                    for call in message.tool_calls
+                ]
+                databasetool.insert_history(user_name=username, agent_name=self.scenario,tool_calls=tool_calls,role="assistant")
                 total_messages.append({
                     "role": "assistant",
                     "content": "",
@@ -67,8 +81,6 @@ class ChatGptTool:
                 for tool_call in message.tool_calls:
                     func_name = tool_call.function.name
                     args = json.loads(tool_call.function.arguments)
-
-                    # 调用远程工具（统一接口）
                     # 调用本地工具
                     result=None
                     # 查找本地工具
@@ -77,8 +89,9 @@ class ChatGptTool:
                         handler = tool["handler"]
                         try:
                             # 支持异步/同步 handler
-                            result =  handler(**args)
+                            result =  handler(args)
                         except Exception as e:
+                            print(f"error: {str(e)}")
                             result = {"error": str(e)}
                     else:
                         result = {"error": f"Tool {func_name} not found"}
@@ -90,7 +103,7 @@ class ChatGptTool:
                     })
             return "已达到最大处理轮数，请简化请求。"
         except Exception as e:
-            print(f"错误: {str(e)}")
+            print(f"chat错误: {str(e)}")
             return f"错误: {str(e)}"
 
 
