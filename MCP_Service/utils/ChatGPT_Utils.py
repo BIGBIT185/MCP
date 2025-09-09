@@ -49,7 +49,6 @@ class ChatGptTool:
             total_messages = self.system_prompt + messages
             
             for _ in range(5):
-                print(total_messages)
                 response = self.__client.chat.completions.create(
                     model=self.model,
                     messages=total_messages,
