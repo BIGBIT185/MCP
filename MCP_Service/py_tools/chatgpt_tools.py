@@ -11,8 +11,7 @@ def chat_with_poet(args: Dict[str, Any]):
         user_content = args.get('user_content')
         if not user_content:
             return ValueError("Missing 'user_content' parameter")
-        print(user_content)
-        databasetool.insert_history(user_name=username,agent_name="poet_prompt",content=user_content,role="user")#插入用户输入的内容
+        databasetool.insert_history(user_name=username,agent_name="chat_with_poet",content=user_content,role="user")#插入用户输入的内容
         messages=databasetool.get_last_n_history(user_name=username,agent_name="poet_prompt",n=20)#获取最近n条历史记录
         from MCP_Service.main import chat_with_poet_tool
         ai_reply = chat_with_poet_tool.chat(messages)
